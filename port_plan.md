@@ -1,6 +1,9 @@
 # Porting OpenTUI to Go — Detailed Plan
 
-Status: in progress — pure-Go core, text engine, and P0 widgets implemented
+Status: in progress — pure-Go core and text engine implemented; Phase 2 Code, Diff,
+Markdown, TextTable, and LineNumber widgets plus SyntaxStyle support are implemented. Phase 3
+wheel scroll chaining is implemented; acceleration, sticky scroll, viewport culling,
+and child-into-view remain deferred.
 Source: `github.com/anomalyco/opentui` @ `cb3d425` (2026-10-30), MIT
 Target: a Go library with ~90% parity for OpenTUI **core + widgets**
 Working dir: `/code/gotui`
@@ -117,9 +120,9 @@ for 90%; P1 = strongly desirable; P2 = out of scope for the first 90% (feature-g
 | P0 | `TabSelectRenderable` | 437 | Select | Tabs. |
 | P0 | `SliderRenderable` | 295 | native slider node | Native slider thumb. |
 | P0 | `ASCIIFontRenderable` | 233 | fonts JSON, buffer | Banner text. |
-| P1 | `CodeRenderable` | 654 | text buffer, tree-sitter/chroma | Syntax highlighting; use Chroma in pure Go. |
-| P1 | `DiffRenderable` | 1360 | text buffer, diff lib | Unified/split diffs; use a Go diff lib. |
-| P1 | `MarkdownRenderable` | 2310 | text, code, table, tree-sitter | Markdown AST + render; use Goldmark. |
+| P1 | `CodeRenderable` | 654 | `text.HighlightCode`, `text.SplitLines` | Dependency-free lexical syntax highlighting. |
+| P1 | `DiffRenderable` | 1360 | text buffer | Unified line diff with bounded LCS memory. |
+| P1 | `MarkdownRenderable` | 2310 | text, code, table | Built-in common block and inline Markdown subset. |
 | P1 | `TextTableRenderable` | 1288 | text buffer, width | Tables with wrapping/alignment. |
 | P1 | `LineNumberRenderable` | 772 | scrollbox, text view | Gutter line numbers. |
 | P1 | `ImageRenderable` | 309 | image codecs, kitty/sixel/blocks | PNG/JPEG/WebP/GIF, fit modes, protocols. |
@@ -135,8 +138,8 @@ for 90%; P1 = strongly desirable; P2 = out of scope for the first 90% (feature-g
 - `@opentui/three` (WebGPU 3D).
 - `@opentui/ssh` (the Go port can use `golang.org/x/crypto/ssh` later; cheap, but not core).
 - `@opentui/qrcode` (cheap via `skip2/go-qrcode`, later).
-- Tree-sitter WASM worker model: replace with Chroma (pure Go) for Code/Markdown; optionally
-  `go-tree-sitter` (cgo) for exact grammars later.
+- Tree-sitter WASM worker model: use the built-in lightweight lexer/parser; consider
+  optional grammar dependencies later if exact language coverage is needed.
 - Exact pixel/GPU post effects: CPU effects only, may not match 3D.
 
 ---
@@ -529,15 +532,15 @@ Exit: `box`, `text`, `ascii-font`, `layout` demos at parity across sizes.
 
 - Rope, TextBuffer, TextBufferView, EditBuffer, EditorView, Selection, Extmarks, SyntaxStyle.
 - Textarea, Input, EditBufferRenderable.
-- Code (Chroma), Diff, TextTable, Markdown (Goldmark), LineNumber.
+- Code, Diff, TextTable, Markdown, LineNumber (dependency-free implementations).
 - Port text/edit/rope/editor golden tests.
 
 Exit: `editor`, `input`, `textarea`, `code`, `diff`, `markdown`, `text-table` demos at parity.
 
 ### Phase 3 — Scroll + selection widgets (4–6 weeks)
 
-- ScrollBox (wrapper/viewport/content/bar), ScrollBar, scroll acceleration/chain, sticky,
-  viewport culling, child-into-view.
+- ScrollBox, ScrollBar, nested wheel scroll chaining. Scroll acceleration, sticky scroll,
+  viewport culling, and child-into-view remain deferred.
 - Select, TabSelect, Slider.
 - Port scroll/select/slider snapshots; mouse drag tests.
 

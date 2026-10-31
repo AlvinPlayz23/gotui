@@ -96,14 +96,30 @@ func NewScrollBox(opts ScrollBoxOptions) *ScrollBox {
 	}
 	sb.Base.OnScroll = func(ev *input.MouseEvent) bool {
 		if ev.Action == input.MouseWheel {
-			step := 3
-			if ev.ScrollX != 0 || ev.Shift {
-				sb.ScrollXBy(step * ev.ScrollX)
+			if !ev.ScrollDeltaSet {
+				dx, dy := 0, 0
+				if ev.ScrollX != 0 {
+					dx = ev.ScrollX
+				}
+				if ev.Shift && dx == 0 {
+					dx = ev.Scroll
+				} else if ev.ScrollX == 0 {
+					dy = ev.Scroll
+				}
+				ev.ScrollDeltaX, ev.ScrollDeltaY = dx*3, dy*3
+				ev.ScrollDeltaSet = true
 			}
-			if ev.Scroll != 0 {
-				sb.ScrollBy(step * ev.Scroll)
+			if ev.ScrollDeltaX == 0 && ev.ScrollDeltaY == 0 {
+				return false
 			}
-			return true
+			oldX, oldY := sb.ScrollX, sb.ScrollY
+			sb.ScrollXBy(ev.ScrollDeltaX)
+			sb.ScrollBy(ev.ScrollDeltaY)
+			ev.ScrollDeltaX -= sb.ScrollX - oldX
+			ev.ScrollDeltaY -= sb.ScrollY - oldY
+			// dispatchMouse continues toward parent containers when this box
+			// reaches an edge, carrying only the unconsumed cell delta.
+			return ev.ScrollDeltaX == 0 && ev.ScrollDeltaY == 0
 		}
 		return false
 	}

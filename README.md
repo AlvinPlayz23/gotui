@@ -3,9 +3,9 @@
 A pure-Go port of [OpenTUI](https://github.com/anomalyco/opentui)'s core and widgets.
 No native libraries, no cgo. One static binary.
 
-This is an in-progress port of the plan in [port_plan.md](port_plan.md). The
-deliverable so far is the pure-Go path: a cell renderer, Yoga-compatible flex
-layout, input parsing, a text engine, and the P0 widget set.
+This is an in-progress pure-Go port of the plan in [port_plan.md](port_plan.md):
+a cell renderer, Yoga-compatible flex layout, input parsing, a text engine, and
+the core widget set.
 
 ## Status
 
@@ -20,7 +20,12 @@ Implemented:
   buffer with cursor/selection/undo/redo/extmarks, editor view with cursor
   scrolling.
 - **Widgets**: Box, Text, ScrollBox, Input, Textarea, Editor, Select,
-  TabSelect, Slider, ScrollBar, ASCIIFont, ProgressBar, Spinner.
+  TabSelect, Slider, ScrollBar, ASCIIFont, ProgressBar, Spinner, Code, Diff,
+  Markdown, TextTable, and LineNumber. Nested ScrollBoxes chain unconsumed wheel
+  movement to their parent.
+- **Text styling**: reusable `text.SyntaxStyle` and a dependency-free lexical
+  highlighter for common languages. Markdown supports common block and inline
+  syntax, including fenced code and pipe tables.
 - **Testing**: golden-frame snapshots (`testing` package) and unit tests across
   color, width, ANSI, layout, text, input, and widgets.
 
@@ -28,7 +33,6 @@ Not implemented yet (from the plan):
 
 - Native FFI backend (this port went straight to pure Go).
 - Images, video, audio, clipboard, embedded terminal.
-- Code/Markdown/Diff/TextTable widgets and syntax highlighting.
 - Post effects, animation timeline, plugins, split-footer/scrollback,
   terminal capability detection, kitty keyboard protocol.
 
@@ -102,10 +106,10 @@ The demo has Form, List, Widgets, and Editor tabs. `tab` cycles focus, `q` or
 | `app` | Terminal app lifecycle |
 | `renderer` | Event loop, frames, mouse routing, focus |
 | `renderable` | Base renderable, paint context, hit testing |
-| `renderables` | Box, Text, Input, Textarea, Editor, Select, Slider, ... |
+| `renderables` | Box, Text, Input, Textarea, Editor, Select, Slider, Code, Diff, Markdown, TextTable, LineNumber, ... |
 | `layout` | Yoga-compatible flexbox |
 | `cell` | Cell grid and drawing primitives |
-| `text` | Rope, text buffer/view, edit buffer/editor view |
+| `text` | Rope, text buffer/view, edit buffer/editor view, syntax styles and highlighting |
 | `input` | Key, mouse, paste, resize parser |
 | `ansi` | Escape sequences and frame diff encoder |
 | `color` | RGBA parsing, blending, palettes |

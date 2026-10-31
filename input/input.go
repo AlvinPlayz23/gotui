@@ -60,6 +60,10 @@ type MouseEvent struct {
 	Alt     bool
 	Shift   bool
 	Motion  bool
+	// ScrollDeltaX/Y carry the remaining cell delta while a wheel event bubbles
+	// through nested scroll containers. Applications normally leave these unset.
+	ScrollDeltaX, ScrollDeltaY int
+	ScrollDeltaSet             bool
 }
 
 // PasteEvent carries pasted text.
