@@ -1,0 +1,6 @@
+demo.test
+/demo
+*.exe
+*.out
+.idea/
+.vscode/

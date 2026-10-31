@@ -1,0 +1,19 @@
+gotui is a Go port of OpenTUI's core API and widget behavior.
+
+OpenTUI
+  https://github.com/anomalyco/opentui
+  Copyright (c) OpenTUI contributors
+  MIT License
+  Pinned reference: cb3d425 (2026-10-30)
+
+The public API, widget semantics, layout behavior, and default styles follow
+OpenTUI. No OpenTUI source files are vendored in this repository; the Go code
+is an independent implementation of the same behavior.
+
+Third-party Go dependencies:
+
+  github.com/rivo/uniseg        MIT
+  golang.org/x/term             BSD-3-Clause
+  golang.org/x/sys              BSD-3-Clause
+
+See LICENSE for the license of this project.
