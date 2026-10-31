@@ -57,6 +57,7 @@ func buildRoot(quit func()) renderable.Renderable {
 			{Name: "List", Content: listTab()},
 			{Name: "Widgets", Content: widgetsTab()},
 			{Name: "Editor", Content: editorTab()},
+			{Name: "Text", Content: textWidgetsTab()},
 		},
 		TabBarBG: surface,
 		ActiveBG: accent,
@@ -226,4 +227,29 @@ func editorTab() renderable.Renderable {
 
 	p.Add(ed)
 	return p
+}
+
+func textWidgetsTab() renderable.Renderable {
+	p := panel("Text widgets")
+	p.Add(label("Code"), renderables.NewCode("func greet(name string) {\n\t// Say hello\n\tfmt.Println(\"hello\", name)\n}", renderables.CodeOptions{
+		Language: "go", LineNumbers: true, Wrap: text.WrapWord,
+		Style: layout.Style{Direction: layout.Column, Width: layout.Pct(100)},
+	}))
+	p.Add(label("Markdown"), renderables.NewMarkdown(renderables.MarkdownOptions{
+		Content: "## Notes\nA **pure Go** terminal UI with [Unicode](https://unicode.org) support.\n\n- Markdown blocks\n- Inline `code`\n\n> Scroll chaining moves the wheel to a parent at the inner edge.",
+		Wrap:    text.WrapWord,
+		Style:   layout.Style{Direction: layout.Column, Width: layout.Pct(100)},
+	}))
+	p.Add(label("Diff"), renderables.NewDiff(renderables.DiffOptions{
+		Old: "title = \"old\"\ncolor = \"blue\"\n", New: "title = \"new\"\ncolor = \"blue\"\nready = true\n",
+		Style: layout.Style{Direction: layout.Column, Width: layout.Pct(100)},
+	}))
+	p.Add(label("Table"), renderables.NewTextTable(renderables.TextTableOptions{
+		Headers: []string{"Widget", "Status"}, Rows: [][]string{{"Code", "ready"}, {"Markdown", "ready"}, {"Diff", "ready"}},
+		Border: true, Style: layout.Style{Direction: layout.Column, Width: layout.Pct(100)},
+	}))
+	p.Add(label("Line numbers"), renderables.NewLineNumber("first line\nsecond line\nthird line", renderables.LineNumberOptions{
+		Style: layout.Style{Direction: layout.Column, Width: layout.Pct(100)},
+	}))
+	return scrollable(p)
 }
