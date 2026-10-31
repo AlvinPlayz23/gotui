@@ -2,6 +2,8 @@ package renderables
 
 import (
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/bijim/gotui/cell"
 	"github.com/bijim/gotui/color"
@@ -84,24 +86,26 @@ func (m *Markdown) compiled() text.StyledText {
 		return m.styled
 	}
 	lines := strings.Split(strings.ReplaceAll(m.Content, "\r\n", "\n"), "\n")
-	var out strings.Builder
 	chunks := make([]text.Chunk, 0, len(lines)*2)
 	appendChunk := func(s string, fg, bg color.RGBA, attr cell.Attribute) {
 		if s == "" {
 			return
 		}
 		chunks = append(chunks, text.Chunk{Text: s, FG: fg, BG: bg, Attr: attr})
-		out.WriteString(s)
 	}
 	for i := 0; i < len(lines); {
 		line := lines[i]
 		if strings.HasPrefix(strings.TrimSpace(line), "```") || strings.HasPrefix(strings.TrimSpace(line), "~~~") {
 			marker := strings.TrimSpace(line)
-			fence := marker[:3]
-			lang := strings.TrimSpace(marker[3:])
+			fenceChar := marker[0]
+			fenceLen := 0
+			for fenceLen < len(marker) && marker[fenceLen] == fenceChar {
+				fenceLen++
+			}
+			lang := strings.TrimSpace(marker[fenceLen:])
 			i++
 			var code strings.Builder
-			for i < len(lines) && !strings.HasPrefix(strings.TrimSpace(lines[i]), fence) {
+			for i < len(lines) && !isClosingMarkdownFence(lines[i], fenceChar, fenceLen) {
 				code.WriteString(lines[i])
 				code.WriteByte('\n')
 				i++
@@ -109,7 +113,13 @@ func (m *Markdown) compiled() text.StyledText {
 			if i < len(lines) {
 				i++
 			}
-			styled := text.HighlightCode(strings.TrimSuffix(code.String(), "\n"), lang, m.SyntaxStyle)
+			codeStyle := m.SyntaxStyle
+			if codeStyle == (text.SyntaxStyle{}) {
+				codeStyle = text.DefaultSyntaxStyle()
+				codeStyle.Plain.FG = m.CodeFG
+				codeStyle.Plain.BG = m.CodeBG
+			}
+			styled := text.HighlightCode(strings.TrimSuffix(code.String(), "\n"), lang, codeStyle)
 			appendChunk("  ", m.CodeFG, m.CodeBG, 0)
 			for _, c := range styled.Chunks {
 				bg := c.BG
@@ -150,7 +160,7 @@ func (m *Markdown) compiled() text.StyledText {
 			for range level - 1 {
 				style |= cell.AttrUnderline
 			}
-			writeInlineMarkdown(&chunks, &out, heading, m.FG, m.BG, m.HeadingFG, style, m.LinkFG)
+			writeInlineMarkdown(&chunks, heading, m.HeadingFG, m.BG, m.HeadingFG, style, m.LinkFG)
 			appendChunk("\n", m.FG, m.BG, 0)
 			i++
 			continue
@@ -158,14 +168,14 @@ func (m *Markdown) compiled() text.StyledText {
 		if strings.HasPrefix(trim, ">") {
 			quote := strings.TrimSpace(strings.TrimPrefix(trim, ">"))
 			appendChunk("│ ", m.QuoteFG, m.BG, 0)
-			writeInlineMarkdown(&chunks, &out, quote, m.FG, m.BG, m.QuoteFG, 0, m.LinkFG)
+			writeInlineMarkdown(&chunks, quote, m.QuoteFG, m.BG, m.QuoteFG, 0, m.LinkFG)
 			appendChunk("\n", m.FG, m.BG, 0)
 			i++
 			continue
 		}
 		if marker, body, ok := markdownListItem(trim); ok {
 			appendChunk("  "+marker+" ", m.FG, m.BG, 0)
-			writeInlineMarkdown(&chunks, &out, body, m.FG, m.BG, m.HeadingFG, 0, m.LinkFG)
+			writeInlineMarkdown(&chunks, body, m.FG, m.BG, m.HeadingFG, 0, m.LinkFG)
 			appendChunk("\n", m.FG, m.BG, 0)
 			i++
 			continue
@@ -176,19 +186,31 @@ func (m *Markdown) compiled() text.StyledText {
 			paragraph = append(paragraph, strings.TrimSpace(lines[i]))
 			i++
 		}
-		writeInlineMarkdown(&chunks, &out, strings.Join(paragraph, " "), m.FG, m.BG, m.HeadingFG, 0, m.LinkFG)
+		writeInlineMarkdown(&chunks, strings.Join(paragraph, " "), m.FG, m.BG, m.HeadingFG, 0, m.LinkFG)
 		appendChunk("\n", m.FG, m.BG, 0)
+	}
+	for len(chunks) > 0 {
+		last := len(chunks) - 1
+		trimmed := strings.TrimRight(chunks[last].Text, "\n")
+		if trimmed == chunks[last].Text {
+			break
+		}
+		chunks[last].Text = trimmed
+		if trimmed == "" {
+			chunks = chunks[:last]
+		} else {
+			break
+		}
 	}
 	m.styled = text.StyledText{Chunks: chunks}
 	m.valid = true
 	return m.styled
 }
 
-func writeInlineMarkdown(dst *[]text.Chunk, plain *strings.Builder, s string, fg, bg, accent color.RGBA, baseAttr cell.Attribute, linkFG color.RGBA) {
+func writeInlineMarkdown(dst *[]text.Chunk, s string, fg, bg, accent color.RGBA, baseAttr cell.Attribute, linkFG color.RGBA) {
 	append := func(v string, colorFG color.RGBA, attr cell.Attribute) {
 		if v != "" {
 			*dst = append(*dst, text.Chunk{Text: v, FG: colorFG, BG: bg, Attr: attr | baseAttr})
-			plain.WriteString(v)
 		}
 	}
 	for i := 0; i < len(s); {
@@ -214,7 +236,9 @@ func writeInlineMarkdown(dst *[]text.Chunk, plain *strings.Builder, s string, fg
 		if strings.HasPrefix(s[i:], "**") || strings.HasPrefix(s[i:], "__") {
 			mark := s[i : i+2]
 			j := strings.Index(s[i+2:], mark)
-			if j >= 0 {
+			closeAt := i + 2 + j
+			valid := j >= 0 && (mark == "**" || validUnderscoreEmphasis(s, i, closeAt, 2))
+			if valid {
 				append(s[i+2:i+2+j], accent, cell.AttrBold)
 				i += j + 4
 				continue
@@ -223,23 +247,62 @@ func writeInlineMarkdown(dst *[]text.Chunk, plain *strings.Builder, s string, fg
 		if s[i] == '*' || s[i] == '_' {
 			mark := s[i : i+1]
 			j := strings.Index(s[i+1:], mark)
-			if j > 0 {
+			closeAt := i + 1 + j
+			valid := j > 0 && (mark == "*" || validUnderscoreEmphasis(s, i, closeAt, 1))
+			if valid {
 				append(s[i+1:i+1+j], accent, cell.AttrItalic)
 				i += j + 2
 				continue
 			}
 		}
+		start := i
 		_, size := runeAt(s, i)
-		append(s[i:i+size], fg, cell.AttrNone)
 		i += size
+		for i < len(s) && !strings.ContainsRune("`[*_", rune(s[i])) {
+			_, size = runeAt(s, i)
+			i += size
+		}
+		append(s[start:i], fg, cell.AttrNone)
 	}
 }
 
 func runeAt(s string, i int) (rune, int) {
-	for _, r := range s[i:] {
-		return r, len(string(r))
+	r, size := utf8.DecodeRuneInString(s[i:])
+	if size == 0 {
+		return utf8.RuneError, 1
 	}
-	return 0, 1
+	return r, size
+}
+
+func validUnderscoreEmphasis(s string, open, close, markerWidth int) bool {
+	contentStart, contentEnd := open+markerWidth, close
+	if contentStart >= contentEnd || unicode.IsSpace([]rune(s[contentStart:])[0]) || unicode.IsSpace([]rune(s[:contentEnd])[len([]rune(s[:contentEnd]))-1]) {
+		return false
+	}
+	isWord := func(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' }
+	if open > 0 {
+		prev, _ := utf8.DecodeLastRuneInString(s[:open])
+		if isWord(prev) {
+			return false
+		}
+	}
+	after := close + markerWidth
+	if after < len(s) {
+		next, _ := utf8.DecodeRuneInString(s[after:])
+		if isWord(next) {
+			return false
+		}
+	}
+	return true
+}
+
+func isClosingMarkdownFence(line string, char byte, minLength int) bool {
+	trimmed := strings.TrimSpace(line)
+	n := 0
+	for n < len(trimmed) && trimmed[n] == char {
+		n++
+	}
+	return n >= minLength && strings.TrimSpace(trimmed[n:]) == ""
 }
 
 func markdownHeading(s string) (int, string) {
@@ -286,7 +349,25 @@ func isMarkdownBlockLine(line string) bool {
 	}
 	return strings.HasPrefix(trim, "|")
 }
-func isMarkdownTableRule(s string) bool { return strings.Contains(s, "-") && strings.Contains(s, "|") }
+func isMarkdownTableRule(s string) bool {
+	cells := markdownCells(s)
+	if len(cells) == 0 {
+		return false
+	}
+	for _, cell := range cells {
+		cell = strings.TrimSpace(cell)
+		if strings.HasPrefix(cell, ":") {
+			cell = cell[1:]
+		}
+		if strings.HasSuffix(cell, ":") {
+			cell = cell[:len(cell)-1]
+		}
+		if strings.Count(cell, "-") < 3 || strings.Trim(cell, "-") != "" {
+			return false
+		}
+	}
+	return true
+}
 
 func markdownCells(line string) []string {
 	s := strings.TrimSpace(line)

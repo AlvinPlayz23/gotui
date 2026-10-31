@@ -116,6 +116,18 @@ func cloneRows(rows [][]string) [][]string {
 
 func (t *TextTable) SetRows(rows [][]string) {
 	t.Rows = cloneRows(rows)
+	count := len(t.Columns)
+	for _, row := range t.Rows {
+		count = maxInt(count, len(row))
+	}
+	for len(t.Columns) < count {
+		i := len(t.Columns)
+		col := TableColumn{}
+		if i < len(t.Headers) {
+			col.Title = t.Headers[i]
+		}
+		t.Columns = append(t.Columns, col)
+	}
 	t.Invalidate()
 	t.RequestRender()
 }
@@ -153,14 +165,18 @@ func (t *TextTable) naturalWidths() []int {
 
 func (t *TextTable) widths(avail int) []int {
 	w := t.naturalWidths()
-	if !t.Border {
-		return w
+	limit := avail
+	if t.Border {
+		limit -= len(w) + 1
 	}
-	limit := avail - len(w) - 1
 	for sumWidths(w) > limit {
 		idx := -1
 		for i := range w {
-			if w[i] > 1 && (idx < 0 || w[i] > w[idx]) {
+			floor := 2*t.CellPadding + 1
+			if t.Columns[i].MinWidth > 0 {
+				floor = maxInt(floor, t.Columns[i].MinWidth+2*t.CellPadding)
+			}
+			if w[i] > floor && (idx < 0 || w[i] > w[idx]) {
 				idx = i
 			}
 		}
@@ -281,17 +297,22 @@ func (t *TextTable) Paint(ctx *renderable.Context) {
 				rowHeight = maxInt(rowHeight, len(lines))
 			}
 		}
-		x := r.X
-		if t.Border {
-			ctx.SetString(x, y, "│", t.BorderColor, t.BG, 0)
-			x++
+		fg, bg := t.FG, t.BG
+		if rowIndex == 0 && (len(t.Headers) > 0 || hasColumnTitle(t.Columns)) {
+			fg, bg = t.HeaderFG, t.HeaderBG
 		}
-		for col, colWidth := range w {
-			if t.Border && col > 0 {
-				ctx.SetString(x, y, "│", t.BorderColor, t.BG, 0)
+		for lineNo := 0; lineNo < rowHeight && y+lineNo < r.Bottom(); lineNo++ {
+			x := r.X
+			if t.Border {
+				ctx.SetString(x, y+lineNo, "│", t.BorderColor, t.BG, 0)
 				x++
 			}
-			for lineNo := 0; lineNo < rowHeight && y+lineNo < r.Bottom(); lineNo++ {
+			for col, colWidth := range w {
+				if t.Border && col > 0 {
+					ctx.SetString(x, y+lineNo, "│", t.BorderColor, t.BG, 0)
+					x++
+				}
+				ctx.Fill(x, y+lineNo, colWidth, 1, bg)
 				var line text.Line
 				if col < len(cells) && lineNo < len(cells[col]) {
 					line = cells[col][lineNo]
@@ -306,19 +327,12 @@ func (t *TextTable) Paint(ctx *renderable.Context) {
 				} else if align == TableAlignCenter {
 					left += pad / 2
 				}
-				if lineNo == 0 {
-					ctx.SetString(x, y+lineNo, strings.Repeat(" ", left), t.FG, t.BG, 0)
-				}
-				fg, bg := t.FG, t.BG
-				if rowIndex == 0 && (len(t.Headers) > 0 || hasColumnTitle(t.Columns)) {
-					fg, bg = t.HeaderFG, t.HeaderBG
-				}
 				paintLine(ctx, x+left, x+colWidth-t.CellPadding, y+lineNo, line, fg, bg)
+				x += colWidth
 			}
-			x += colWidth
-		}
-		if t.Border {
-			ctx.SetString(x, y, "│", t.BorderColor, t.BG, 0)
+			if t.Border {
+				ctx.SetString(x, y+lineNo, "│", t.BorderColor, t.BG, 0)
+			}
 		}
 		y += rowHeight
 		if t.Border && rowIdx+1 < len(rows) {

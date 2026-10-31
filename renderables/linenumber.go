@@ -51,6 +51,9 @@ func NewLineNumber(content string, opts ...LineNumberOptions) *LineNumber {
 	if o.NumberFG == (color.RGBA{}) {
 		o.NumberFG = Gray
 	}
+	if o.NumberBG == (color.RGBA{}) {
+		o.NumberBG = o.BG
+	}
 	if o.GutterWidth < 0 {
 		o.GutterWidth = 0
 	}

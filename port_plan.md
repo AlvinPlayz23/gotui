@@ -1,7 +1,7 @@
 # Porting OpenTUI to Go — Detailed Plan
 
 Status: in progress — pure-Go core and text engine implemented; Phase 2 Code, Diff,
-Markdown, TextTable, LineNumber, and SyntaxStyle widgets are implemented. Phase 3
+Markdown, TextTable, and LineNumber widgets plus SyntaxStyle support are implemented. Phase 3
 wheel scroll chaining is implemented; acceleration, sticky scroll, viewport culling,
 and child-into-view remain deferred.
 Source: `github.com/anomalyco/opentui` @ `cb3d425` (2026-10-30), MIT
@@ -120,7 +120,7 @@ for 90%; P1 = strongly desirable; P2 = out of scope for the first 90% (feature-g
 | P0 | `TabSelectRenderable` | 437 | Select | Tabs. |
 | P0 | `SliderRenderable` | 295 | native slider node | Native slider thumb. |
 | P0 | `ASCIIFontRenderable` | 233 | fonts JSON, buffer | Banner text. |
-| P1 | `CodeRenderable` | 654 | text buffer, syntax style | Dependency-free lexical syntax highlighting. |
+| P1 | `CodeRenderable` | 654 | `text.HighlightCode`, `text.SplitLines` | Dependency-free lexical syntax highlighting. |
 | P1 | `DiffRenderable` | 1360 | text buffer | Unified line diff with bounded LCS memory. |
 | P1 | `MarkdownRenderable` | 2310 | text, code, table | Built-in common block and inline Markdown subset. |
 | P1 | `TextTableRenderable` | 1288 | text buffer, width | Tables with wrapping/alignment. |

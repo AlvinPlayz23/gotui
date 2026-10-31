@@ -177,11 +177,18 @@ func (d *Diff) buildRows() []diffRow {
 			}
 			rows = append(rows, diffRow{kind: op.kind, oldLine: op.oldLine, newLine: op.newLine, content: op.text})
 		}
-		rows = append(rows, diffRow{kind: diffHunk, content: fmt.Sprintf("@@ -%d,%d +%d,%d @@", maxInt(1, oldStart+1), oldCount, maxInt(1, newStart+1), newCount)})
+		oldHunkStart, newHunkStart := oldStart+1, newStart+1
+		if oldCount == 0 {
+			oldHunkStart = oldStart
+		}
+		if newCount == 0 {
+			newHunkStart = newStart
+		}
+		rows = append(rows, diffRow{kind: diffHunk, content: fmt.Sprintf("@@ -%d,%d +%d,%d @@", oldHunkStart, oldCount, newHunkStart, newCount)})
 		// Keep the hunk header before its contents.
+		hunk := rows[len(rows)-1]
 		copy(rows[start+1:], rows[start:len(rows)-1])
-		rows[start] = rows[len(rows)-1]
-		rows = rows[:len(rows)-1]
+		rows[start] = hunk
 	}
 	d.rows, d.valid = rows, true
 	return rows

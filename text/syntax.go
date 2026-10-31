@@ -99,17 +99,29 @@ func HighlightCode(source, language string, style SyntaxStyle) StyledText {
 	lang := strings.ToLower(strings.TrimSpace(language))
 	keywords := keywordSet(lang)
 	runes := []rune(source)
-	chunks := make([]Chunk, 0, len(runes)/8+1)
+	chunks := make([]Chunk, 0, len(runes)/32+1)
+	var run strings.Builder
+	var runStyle TokenStyle
+	runActive := false
+	flushRun := func() {
+		if runActive {
+			chunks = append(chunks, Chunk{Text: run.String(), FG: runStyle.FG, BG: runStyle.BG, Attr: runStyle.Attr})
+			run.Reset()
+			runActive = false
+		}
+	}
 	appendToken := func(token SyntaxToken, text string) {
 		if text == "" {
 			return
 		}
 		st := style.style(token)
-		if n := len(chunks); n > 0 && chunks[n-1].FG == st.FG && chunks[n-1].BG == st.BG && chunks[n-1].Attr == st.Attr {
-			chunks[n-1].Text += text
-		} else {
-			chunks = append(chunks, Chunk{Text: text, FG: st.FG, BG: st.BG, Attr: st.Attr})
+		if runActive && runStyle == st {
+			run.WriteString(text)
+			return
 		}
+		flushRun()
+		runStyle, runActive = st, true
+		run.WriteString(text)
 	}
 	for i := 0; i < len(runes); {
 		start := i
@@ -171,8 +183,12 @@ func HighlightCode(source, language string, style SyntaxStyle) StyledText {
 				i++
 			}
 			word := string(runes[start:i])
+			lookup := word
+			if lang == "sql" {
+				lookup = strings.ToLower(word)
+			}
 			token := TokenPlain
-			if keywords[word] {
+			if keywords[lookup] {
 				token = TokenKeyword
 			} else if nextNonSpace(runes, i) == '(' {
 				token = TokenFunction
@@ -191,6 +207,7 @@ func HighlightCode(source, language string, style SyntaxStyle) StyledText {
 			appendToken(TokenPlain, string(r))
 		}
 	}
+	flushRun()
 	return StyledText{Chunks: chunks}
 }
 
@@ -218,7 +235,26 @@ func isCommentStart(r []rune, i int, lang string) bool {
 	if r[i] == '#' && (lang == "python" || lang == "py" || lang == "shell" || lang == "sh" || lang == "bash" || lang == "yaml" || lang == "yml" || lang == "toml" || lang == "") {
 		return true
 	}
-	return r[i] == '/' && i+1 < len(r) && (r[i+1] == '/' || r[i+1] == '*')
+	if lang == "sql" && r[i] == '-' && i+1 < len(r) && r[i+1] == '-' {
+		return true
+	}
+	if r[i] != '/' || i+1 >= len(r) || (r[i+1] != '/' && r[i+1] != '*') {
+		return false
+	}
+	if r[i+1] == '/' {
+		switch lang {
+		case "python", "py", "sql", "shell", "sh", "bash", "yaml", "yml", "toml", "json":
+			return false
+		default:
+			return true
+		}
+	}
+	switch lang {
+	case "python", "py", "shell", "sh", "bash", "yaml", "yml", "toml", "json":
+		return false
+	default:
+		return true
+	}
 }
 
 func keywordSet(lang string) map[string]bool {

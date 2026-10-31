@@ -88,9 +88,15 @@ func (c *Code) SetLanguage(language string) {
 
 func (c *Code) lines(width int) []text.Line {
 	source := expandCodeTabs(c.Content, c.TabWidth)
-	if !c.cacheValid || c.cacheSource != source || c.cacheLang != c.Language || c.cacheStyle != c.SyntaxStyle {
-		c.cacheText = text.HighlightCode(source, c.Language, c.SyntaxStyle)
-		c.cacheSource, c.cacheLang, c.cacheStyle = source, c.Language, c.SyntaxStyle
+	style := c.SyntaxStyle
+	if style == (text.SyntaxStyle{}) {
+		style = text.DefaultSyntaxStyle()
+		style.Plain.FG = c.FG
+		style.Plain.BG = c.BG
+	}
+	if !c.cacheValid || c.cacheSource != source || c.cacheLang != c.Language || c.cacheStyle != style {
+		c.cacheText = text.HighlightCode(source, c.Language, style)
+		c.cacheSource, c.cacheLang, c.cacheStyle = source, c.Language, style
 		c.cacheValid = true
 	}
 	return text.SplitLines(c.cacheText, width, c.Wrap)
